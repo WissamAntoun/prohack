@@ -119,3 +119,34 @@ print(xgb_grid.best_score_)
 #              subsample=0.6, tree_method=None, validate_parameters=False,
 #              verbosity=None)
 # -0.021227692090664572
+
+#%%
+
+xgb1 = XGBRegressor(base_score=0.5, booster=None, colsample_bylevel=1,
+             colsample_bynode=1, colsample_bytree=0.7, gamma=0, gpu_id=-1,
+             importance_type='gain', interaction_constraints=None,
+             learning_rate=0.05, max_delta_step=0, max_depth=10,
+             min_child_weight=4, monotone_constraints=None,
+             n_estimators=300, n_jobs=0, num_parallel_tree=1, random_state=42,
+             reg_alpha=0, reg_lambda=1, scale_pos_weight=1, seed=42, silent=1,
+             subsample=0.6, tree_method=None, validate_parameters=False,
+             verbosity=1)
+
+# %%
+
+xgb1.fit(X_train,labels)
+
+# %%
+preds= xgb1.predict(X_test)
+
+# %%
+print(preds)
+
+# %%
+X_test['y'] = preds
+sub_df = X_test[['y','existence expectancy index']]
+#%%
+sub_df.to_csv('submission_task2.csv',index=False)# %%
+
+
+# %%
