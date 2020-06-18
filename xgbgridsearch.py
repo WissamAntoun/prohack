@@ -40,7 +40,7 @@ all_data["galaxy"] = all_data["galaxy"].cat.codes
 all_data_without_year_name = all_data.drop(['galactic year','galaxy'],axis=1)
 #%%
 scaler = RobustScaler().fit(all_data_without_year_name)
-all_data_without_year_name_scaled = scaler.transform(all_data_without_year_name)
+all_data_without_year_name_scaled = all_data_without_year_name#scaler.transform(all_data_without_year_name)
 #%%
 year_name = all_data[['galactic year','galaxy']]
 all_data_without_year_name_scaled_df = pd.DataFrame(all_data_without_year_name_scaled,columns=all_data_without_year_name.columns)
@@ -146,7 +146,7 @@ print(preds)
 X_test['y'] = preds
 sub_df = X_test[['y','existence expectancy index']]
 #%%
-sub_df.to_csv('submission_task2.csv',index=False)# %%
+sub_df.to_csv('submission_task3.csv',index=False)# %%
 
 
 # %%
