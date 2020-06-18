@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "C:\\Users\\WISSAM-PC\\.conda\\envs\\prohack\\python.exe",
+    "python.pythonPath": "C:\\Users\\User\\.conda\\envs\\bert_pretrain\\python.exe",
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": true,
 }
