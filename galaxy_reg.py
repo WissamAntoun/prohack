@@ -76,9 +76,13 @@ X_train_with_labels = pd.concat([X_train,labels],axis=1,sort=False).sort_values(
 predicted_data = pd.DataFrame([])
 for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
     galaxy_data = X_train_with_labels[X_train_with_labels['galaxy']==galaxy][['galaxy','galactic year','y']]
-    trend_line = np.poly1d(np.polyfit(galaxy_data['galactic year'],galaxy_data['y'],deg=3))
     galaxy_data_to_predict = X_test[X_test['galaxy']==galaxy][['galaxy','galactic year']]
-    galaxy_data_to_predict['y'] = galaxy_data_to_predict['galactic year'].apply(lambda x: trend_line(x))
+
+    model = RandomForestRegressor(n_estimators=50)
+    model.fit(np.array(galaxy_data['galactic year']).reshape(-1,1),galaxy_data['y'])
+    galaxy_data_to_predict['y'] = model.predict(np.array(galaxy_data_to_predict['galactic year']).reshape(-1,1))
+    # trend_line = np.poly1d(np.polyfit(galaxy_data['galactic year'],galaxy_data['y'],deg=4))    
+    # galaxy_data_to_predict['y'] = galaxy_data_to_predict['galactic year'].apply(lambda x: trend_line(x))
     
 
     eei_test = test_df[test_df['galaxy']==galaxy][['galactic year','existence expectancy index']]
@@ -87,16 +91,28 @@ for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
 
     predicted_data = pd.concat([predicted_data,galaxy_data_to_predict[['y','existence expectancy index']]])
 
+    # data_to_plot = galaxy_data[['galactic year','y']]
+    # data_to_plot = pd.concat([data_to_plot,galaxy_data_to_predict[['galactic year','y']]]).sort_values('galactic year')
+    
+    # plt.Line2D(xdata=data_to_plot['galactic year'],ydata=data_to_plot['y'])
+    # plt.show()
+    
+    
 
 
+#%%
 
+data_to_plot.set_index('galactic year').plot()
+#%%
+plt.Line2D(xdata=data_to_plot['galactic year'],ydata=data_to_plot['y'])
+plt.show()
 # %%
 
 test_df['y'] = predicted_data[0].values
 sub_df = test_df[['y','existence expectancy index']]
 #%%
 predicted_data.sort_index(inplace=True)
-predicted_data.to_csv('submission_task5.csv',index=False)
+predicted_data.to_csv('submission_task6.csv',index=False)
 
 
 # %%
