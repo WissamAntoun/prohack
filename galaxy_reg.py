@@ -11,6 +11,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.impute import KNNImputer
+from statsmodels.tsa.vector_ar.var_model import VAR
 #%%
 from matplotlib.pylab import rcParams
 rcParams['figure.figsize'] = 20, 4
@@ -45,6 +46,141 @@ all_data_scaled = pd.concat([year_name,all_data_without_year_name_scaled_df],axi
 X_train = all_data_scaled[0:len(train_df)]
 X_test = all_data_scaled[len(train_df):]
 
+#%% Creating Dev-Set
+X_train_with_labels = pd.concat([X_train,labels],axis=1,sort=False).sort_values(['galaxy','galactic year'])
+
+#%%
+X_Dev_with_labels = pd.DataFrame([])
+X_mini_train_with_labels = pd.DataFrame([])
+
+train_with_test_galaxies_df = pd.DataFrame([])
+len_valid_data = []
+
+for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
+    galaxy_data = X_train_with_labels[X_train_with_labels['galaxy']==galaxy]
+    recent_data = galaxy_data[galaxy_data['galactic year'] >= 1010025]
+    old_data = galaxy_data[galaxy_data['galactic year'] < 1010025]
+    X_mini_train_with_labels = pd.concat([X_mini_train_with_labels,old_data])    
+    len_valid_data.append(len(recent_data))
+    if len(recent_data) > 3:
+        X_Dev_with_labels = pd.concat([X_Dev_with_labels,recent_data.iloc[-2:,:]])
+        X_mini_train_with_labels = pd.concat([X_mini_train_with_labels,recent_data.iloc[:-2,:]])
+    else:
+        X_mini_train_with_labels = pd.concat([X_mini_train_with_labels,recent_data])
+    
+    train_with_test_galaxies_df = pd.concat([train_with_test_galaxies_df,galaxy_data])
+    
+
+
+#%%
+
+plt.hist(len_valid_data)
+plt.show()
+
+#%%
+
+predictions_df = pd.DataFrame([])
+for galaxy in tqdm_notebook(X_Dev_with_labels['galaxy'].unique(), desc='Galaxy Loop'):
+    galaxy_data_train = X_mini_train_with_labels[X_mini_train_with_labels['galaxy']==galaxy]
+    galaxy_data_dev = X_Dev_with_labels[X_Dev_with_labels['galaxy']==galaxy]
+    
+    columns_to_remove = []
+    for col in galaxy_data_dev.columns:
+        if galaxy_data_dev[col].isnull().values.any():
+            columns_to_remove.append(col)
+
+    galaxy_data_train.dropna(axis=1,how='all',thresh=int(len(galaxy_data)*0.4),inplace=True)
+    galaxy_data_train.bfill(axis=0,inplace=True)
+
+    columns_to_remove.extend(list(set(galaxy_data_dev.columns) - set(galaxy_data_train.columns))) 
+    #corr = galaxy_data_train.corr()
+    galaxy_data_dev.drop(columns_to_remove,axis=1,inplace=True,errors='ignore')
+    galaxy_data_train.drop(columns_to_remove,axis=1,inplace=True,errors='ignore')
+    orig_year = galaxy_data_train['galactic year'].iloc[0]
+    galaxy_data_train['galactic year'] = ((galaxy_data_train['galactic year'] - orig_year +100)/1000).astype(int)
+    galaxy_data_dev['galactic year'] = ((galaxy_data_dev['galactic year'] - orig_year +100)/1000).astype(int)
+
+    galaxy_data_train_year_index = galaxy_data_train.set_index('galactic year')
+    galaxy_data_train_dev_index = galaxy_data_dev.set_index('galactic year')
+
+    data_to_fit = galaxy_data_train_year_index.drop(['galaxy'],axis=1).copy()
+    for iteration in range(len(galaxy_data_train_dev_index)):
+        model = VAR(endog=np.asarray(data_to_fit))
+        model_fit = model.fit()
+        prediction = model_fit.forecast(model_fit.y, steps=1)
+        data_to_fit = data_to_fit.append(galaxy_data_train_dev_index.drop(['galaxy'],axis=1).iloc[iteration])
+        data_to_fit['y'].iloc[-1]=prediction[0][-1]
+    
+    temp_preds = galaxy_data_dev[['y']]
+    temp_preds['y'] = list(data_to_fit['y'][-len(galaxy_data_dev):].abs())
+    predictions_df = pd.concat([predictions_df,temp_preds])   
+    
+    
+
+#%%
+
+mean_squared_error(X_Dev_with_labels['y'],predictions_df)
+
+#%%
+predictions_df = pd.DataFrame([])
+for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
+    galaxy_data = X_train_with_labels[X_train_with_labels['galaxy']==galaxy]
+    galaxy_data_to_predict = X_test[X_test['galaxy']==galaxy]
+    galaxy_data_to_predict['y'] = np.nan
+
+    all_galaxy_data = pd.concat([galaxy_data,galaxy_data_to_predict]).sort_values('galactic year')
+
+    index_of_first_na = all_galaxy_data.index.get_loc(all_galaxy_data['y'].isna().idxmax())
+
+    data_to_fit = all_galaxy_data.drop(['galaxy'],axis=1).iloc[:index_of_first_na,:]
+    for iteration in range(0,len(all_galaxy_data)-index_of_first_na):
+        if np.isnan(all_galaxy_data['y'].iloc[index_of_first_na+iteration]):
+            data_to_fit_cleaned = data_to_fit.dropna(axis=1,how='all',thresh=int(len(galaxy_data)*0.4))
+
+            #data_to_fit_cleaned.fillna(0,inplace=True,axis=0)
+            imputer = KNNImputer(n_neighbors=3)
+            data_to_fit_cleaned = pd.DataFrame(imputer.fit_transform(data_to_fit_cleaned),columns=data_to_fit_cleaned.columns)
+
+            orig_year = data_to_fit_cleaned['galactic year'].iloc[0]
+            data_to_fit_cleaned['galactic year'] = ((data_to_fit_cleaned['galactic year'] - orig_year +100)/1000).astype(int)
+
+            data_to_fit_cleaned_year_index = data_to_fit_cleaned.set_index('galactic year')
+            model = VAR(endog=np.asarray(data_to_fit_cleaned_year_index))
+            model_fit = model.fit()
+            prediction = model_fit.forecast(model_fit.y, steps=1)
+            prediction_series = pd.DataFrame(prediction,columns=data_to_fit_cleaned_year_index.columns)
+
+            data_to_fit = data_to_fit.append(all_galaxy_data.drop(['galaxy'],axis=1).iloc[index_of_first_na+iteration,:])
+            data_to_fit['y'].iloc[-1]=prediction_series['y'].values[0]
+
+            if np.isnan(all_galaxy_data.iloc[index_of_first_na+iteration,:]['existence expectancy index']):
+                data_to_fit['existence expectancy index'].iloc[-1] = prediction_series['existence expectancy index'].values[0]
+        else:
+            data_to_fit = data_to_fit.append(all_galaxy_data.drop(['galaxy'],axis=1).iloc[index_of_first_na+iteration,:])
+        
+    
+    galaxy_data_to_predict['existence expectancy index'] = data_to_fit['existence expectancy index'][galaxy_data_to_predict['existence expectancy index'].index]
+    galaxy_data_to_predict['y'] = data_to_fit['y'][galaxy_data_to_predict['y'].index]
+    predictions_df = pd.concat([predictions_df,galaxy_data_to_predict[['y','existence expectancy index']].abs()])  
+        
+
+
+#%%
+
+predictions_df = predictions_df.sort_index()
+predictions_df.to_csv('submission_task7.csv',index=False)
+
+
+
+
+
+
+
+
+
+
+
+
 # %%
 Non_data_col = ['galaxy','y']
 predictors = [x for x in all_data_scaled.columns if x not in Non_data_col]
@@ -75,11 +211,11 @@ X_train_with_labels = pd.concat([X_train,labels],axis=1,sort=False).sort_values(
 
 predicted_data = pd.DataFrame([])
 for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
-    galaxy_data = X_train_with_labels[X_train_with_labels['galaxy']==galaxy][['galaxy','galactic year','y']]
+    galaxy_data = X_train_with_labels[X_train_with_labels['galaxy']==galaxy]
     galaxy_data_to_predict = X_test[X_test['galaxy']==galaxy][['galaxy','galactic year']]
 
     model = RandomForestRegressor(n_estimators=50)
-    model.fit(np.array(galaxy_data['galactic year']).reshape(-1,1),galaxy_data['y'])
+    model.fit(np.array(galaxy_data.dr).reshape(-1,1),galaxy_data['y'])
     galaxy_data_to_predict['y'] = model.predict(np.array(galaxy_data_to_predict['galactic year']).reshape(-1,1))
     # trend_line = np.poly1d(np.polyfit(galaxy_data['galactic year'],galaxy_data['y'],deg=4))    
     # galaxy_data_to_predict['y'] = galaxy_data_to_predict['galactic year'].apply(lambda x: trend_line(x))
@@ -96,6 +232,7 @@ for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
     
     # plt.Line2D(xdata=data_to_plot['galactic year'],ydata=data_to_plot['y'])
     # plt.show()
+    break
     
     
 
