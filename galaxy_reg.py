@@ -12,6 +12,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.impute import KNNImputer
 from statsmodels.tsa.vector_ar.var_model import VAR
+from sklearn.ensemble import GradientBoostingRegressor
 #%%
 from matplotlib.pylab import rcParams
 rcParams['figure.figsize'] = 20, 4
@@ -225,11 +226,11 @@ for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
     galaxy_data = X_train_with_labels[X_train_with_labels['galaxy']==galaxy]
     galaxy_data_to_predict = X_test[X_test['galaxy']==galaxy][['galaxy','galactic year']]
 
-    # model = RandomForestRegressor(n_estimators=50)
-    # model.fit(np.array(galaxy_data.dr).reshape(-1,1),galaxy_data['y'])
-    # galaxy_data_to_predict['y'] = model.predict(np.array(galaxy_data_to_predict['galactic year']).reshape(-1,1))
-    trend_line = np.poly1d(np.polyfit(galaxy_data['galactic year'],galaxy_data['y'],deg=4))    
-    galaxy_data_to_predict['y'] = galaxy_data_to_predict['galactic year'].apply(lambda x: trend_line(x))
+    model = GradientBoostingRegressor(n_estimators=300)
+    model.fit(np.array(galaxy_data['galactic year']).reshape(-1,1),galaxy_data['y'])
+    galaxy_data_to_predict['y'] = model.predict(np.array(galaxy_data_to_predict['galactic year']).reshape(-1,1))
+    # trend_line = np.poly1d(np.polyfit(galaxy_data['galactic year'],galaxy_data['y'],deg=4))    
+    # galaxy_data_to_predict['y'] = galaxy_data_to_predict['galactic year'].apply(lambda x: trend_line(x))
     
 
     eei_test = test_df[test_df['galaxy']==galaxy][['galactic year','existence expectancy index']]
@@ -260,7 +261,7 @@ test_df['y'] = predicted_data[0].values
 sub_df = test_df[['y','existence expectancy index']]
 #%%
 predicted_data.sort_index(inplace=True)
-predicted_data.to_csv('submission_task11.csv',index=False)
+predicted_data.to_csv('submission_task12.csv',index=False)
 
 
 # %%
