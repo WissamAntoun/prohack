@@ -149,7 +149,16 @@ for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
             model_fit = model.fit()
             prediction = model_fit.forecast(model_fit.y, steps=1)
             prediction_series = pd.DataFrame(prediction,columns=data_to_fit_cleaned_year_index.columns)
-
+            if np.abs(prediction_series['y'].values[0])>1 or prediction_series['y'].values[0] < 0 or prediction_series['y'].values[0] > 2 * data_to_fit_cleaned['y'].iloc[-1]:
+                print(prediction_series['y'].values[0])
+                trend_line = np.poly1d(np.polyfit(data_to_fit_cleaned['galactic year'],data_to_fit_cleaned['y'],deg=4))
+                x = int((all_galaxy_data.iloc[index_of_first_na+iteration,:]['galactic year'] - orig_year +100)/1000)   
+                prediction_series['y'].values[0] = trend_line(x) 
+                print(prediction_series['y'].values[0])
+                print(iteration)
+                print(galaxy)
+                print(data_to_fit_cleaned['y'])         
+        
             data_to_fit = data_to_fit.append(all_galaxy_data.drop(['galaxy'],axis=1).iloc[index_of_first_na+iteration,:])
             data_to_fit['y'].iloc[-1]=prediction_series['y'].values[0]
 
@@ -158,17 +167,19 @@ for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
         else:
             data_to_fit = data_to_fit.append(all_galaxy_data.drop(['galaxy'],axis=1).iloc[index_of_first_na+iteration,:])
         
+        
     
     galaxy_data_to_predict['existence expectancy index'] = data_to_fit['existence expectancy index'][galaxy_data_to_predict['existence expectancy index'].index]
     galaxy_data_to_predict['y'] = data_to_fit['y'][galaxy_data_to_predict['y'].index]
     predictions_df = pd.concat([predictions_df,galaxy_data_to_predict[['y','existence expectancy index']].abs()])  
+    
         
 
 
 #%%
 
 predictions_df = predictions_df.sort_index()
-predictions_df.to_csv('submission_task8.csv',index=False)
+predictions_df.to_csv('submission_task9.csv',index=False)
 
 
 
