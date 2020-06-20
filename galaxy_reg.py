@@ -137,9 +137,9 @@ for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
         if np.isnan(all_galaxy_data['y'].iloc[index_of_first_na+iteration]):
             data_to_fit_cleaned = data_to_fit.dropna(axis=1,how='all',thresh=int(len(galaxy_data)*0.4))
 
-            #data_to_fit_cleaned.fillna(0,inplace=True,axis=0)
-            imputer = KNNImputer(n_neighbors=3)
-            data_to_fit_cleaned = pd.DataFrame(imputer.fit_transform(data_to_fit_cleaned),columns=data_to_fit_cleaned.columns)
+            data_to_fit_cleaned.fillna(0,inplace=True,axis=0)
+            # imputer = KNNImputer(n_neighbors=3)
+            # data_to_fit_cleaned = pd.DataFrame(imputer.fit_transform(data_to_fit_cleaned),columns=data_to_fit_cleaned.columns)
 
             orig_year = data_to_fit_cleaned['galactic year'].iloc[0]
             data_to_fit_cleaned['galactic year'] = ((data_to_fit_cleaned['galactic year'] - orig_year +100)/1000).astype(int)
@@ -168,7 +168,7 @@ for galaxy in tqdm_notebook(X_test['galaxy'].unique(), desc='Galaxy Loop'):
 #%%
 
 predictions_df = predictions_df.sort_index()
-predictions_df.to_csv('submission_task7.csv',index=False)
+predictions_df.to_csv('submission_task8.csv',index=False)
 
 
 
